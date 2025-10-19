@@ -46,7 +46,8 @@ export default function GameClient() {
   const { toast } = useToast();
 
   const difficulty = useMemo(() => {
-    if (level <= 10) return { name: 'Easy', value: 10, bonus: 0 };
+    if (level <= 5) return { name: 'Beginner', value: 5, bonus: 0 };
+    if (level <= 15) return { name: 'Easy', value: 10, bonus: 10 };
     if (level <= 25) return { name: 'Medium', value: 20, bonus: 25 };
     return { name: 'Hard', value: 30, bonus: 50 };
   }, [level]);
