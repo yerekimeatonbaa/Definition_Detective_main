@@ -1,0 +1,92 @@
+/**
+ * @fileoverview Firestore Security Rules for Definition Detective.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. Each user has exclusive access
+ * to their profile data and associated game sessions.
+ *
+ * Data Structure:
+ * - User profiles are stored in `/users/{userId}`, where `{userId}` matches the Firebase Auth UID.
+ * - Game sessions are stored in `/users/{userProfileId}/game_sessions/{gameSessionId}`,
+ *   where `userProfileId` matches the Firebase Auth UID of the user who owns the session.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own profile data and game sessions.
+ * - Listing user profiles is disallowed to protect user privacy.
+ * - The `userProfileId` is denormalized into the `GameSession` documents to remove authorization dependencies.
+ *
+ * Denormalization for Authorization:
+ * - The `GameSession` documents contain a `userProfileId` field, which is a denormalized copy
+ *   of the owning user's UID. This allows for direct ownership checks without requiring
+ *   additional `get()` calls to the `/users/{userId}` document.
+ *
+ * Structural Segregation:
+ * - User profiles and game sessions are stored in separate collections to maintain
+ *   clear ownership boundaries and optimize query performance.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile data.
+     * @path /users/{userId}
+     * @allow (create) User with UID 'user123' can create their profile with `id` set to 'user123'.
+     * @allow (get, update, delete) User with UID 'user123' can read, update, and delete their profile.
+     * @deny (create) User with UID 'user456' cannot create a profile with `id` set to 'user123'.
+     * @deny (get, update, delete) User with UID 'user456' cannot read, update, or delete the profile of user 'user123'.
+     * @deny (list) All users are denied listing user profiles.
+     * @principle Enforces document ownership for all operations and validates relational integrity on create.
+     */
+    match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to game session data for a specific user.
+     * @path /users/{userProfileId}/game_sessions/{gameSessionId}
+     * @allow (create) User with UID 'user123' can create a game session with `userProfileId` set to 'user123'.
+     * @allow (get, list, update, delete) User with UID 'user123' can read, list, update, and delete their own game sessions.
+     * @deny (create) User with UID 'user456' cannot create a game session for user 'user123'.
+     * @deny (get, update, delete) User with UID 'user456' cannot read, update, or delete game sessions for user 'user123'.
+     * @principle Enforces document ownership, validates relational integrity on create, and ensures the document exists before updates/deletes.
+     */
+    match /users/{userProfileId}/game_sessions/{gameSessionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userProfileId) {
+        return isSignedIn() && request.auth.uid == userProfileId;
+      }
+
+       function isExistingOwner(userProfileId) {
+        return isOwner(userProfileId) && resource != null;
+      }
+
+      allow get: if isOwner(userProfileId);
+      allow list: if isOwner(userProfileId);
+
+      allow create: if isOwner(userProfileId) && request.resource.data.userProfileId == userProfileId;
+      allow update: if isExistingOwner(userProfileId) && request.resource.data.userProfileId == resource.data.userProfileId;
+      allow delete: if isExistingOwner(userProfileId);
+    }
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile with associated information and game statistics.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's chosen username."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "totalScore": {
+          "type": "number",
+          "description": "The user's total score across all games."
+        },
+        "highestLevel": {
+          "type": "number",
+          "description": "The highest level the user has reached."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "totalScore",
+        "highestLevel",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GameSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GameSession",
+      "type": "object",
+      "description": "Represents a single game session, including the score achieved and difficulty.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the game session."
+        },
+        "userProfileId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N GameSession)"
+        },
+        "score": {
+          "type": "number",
+          "description": "The score achieved in this game session."
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "The difficulty level of the game session (e.g., easy, medium, hard)."
+        },
+        "seed": {
+          "type": "string",
+          "description": "The seed used to generate the game level."
+        },
+        "startTime": {
+          "type": "string",
+          "description": "Timestamp indicating when the game session started.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "Timestamp indicating when the game session ended.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userProfileId",
+        "score",
+        "difficulty",
+        "seed",
+        "startTime",
+        "endTime"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile data. This collection uses path-based ownership, where the document ID is equal to the user's Firebase Auth UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userProfileId}/game_sessions/{gameSessionId}",
+        "definition": {
+          "entityName": "GameSession",
+          "schema": {
+            "$ref": "#/backend/entities/GameSession"
+          },
+          "description": "Stores game session data for each user. Includes denormalized 'userProfileId' for authorization independence. The document ID for game_sessions is a unique ID generated when game session is initiated.",
+          "params": [
+            {
+              "name": "userProfileId",
+              "description": "The Firebase Auth UID of the user who owns this game session. Denormalized from the UserProfile."
+            },
+            {
+              "name": "gameSessionId",
+              "description": "The unique ID of the game session."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore structure prioritizes security and scalability for the Definition Detective game. User profiles and game sessions are organized to ensure data ownership and prevent unauthorized access. We leverage path-based ownership and avoid `get()` calls in security rules for Authorization Independence. The structure supports listing operations (QAPs) by clearly separating user-owned data. The design denormalizes userProfileId into GameSession to remove hierarchical authorization dependencies."
+  }
+}
