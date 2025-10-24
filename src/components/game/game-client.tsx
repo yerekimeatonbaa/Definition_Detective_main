@@ -88,9 +88,13 @@ export default function GameClient() {
     return 'hard';
   };
 
-  const startNewGame = useCallback((level: number) => {
-    const difficulty = getDifficultyForLevel(level);
-    const newWordData = getWordByDifficulty(difficulty);
+  const startNewGame = useCallback((currentLevel: number, currentWord?: string) => {
+    const difficulty = getDifficultyForLevel(currentLevel);
+    let newWordData: WordData;
+    do {
+      newWordData = getWordByDifficulty(difficulty);
+    } while (newWordData.word === currentWord);
+    
     setWordData(newWordData);
     setDefinition(newWordData.definition);
     setGuessedLetters({ correct: [], incorrect: [] });
@@ -235,7 +239,7 @@ export default function GameClient() {
       
       setTimeout(() => {
         setLevel(newLevel);
-        startNewGame(newLevel);
+        startNewGame(newLevel, wordData.word);
       }, 2000);
   
     } else if (guessedLetters.incorrect.length >= MAX_INCORRECT_TRIES) {
@@ -290,7 +294,7 @@ export default function GameClient() {
           </AlertDescription>
           {gameState === 'lost' && (
              <div className="mt-4 flex justify-center gap-4">
-                <Button onClick={() => startNewGame(level)}>
+                <Button onClick={() => startNewGame(level, wordData?.word)}>
                     <RotateCw className="mr-2 h-4 w-4" /> Retry Level
                 </Button>
             </div>
@@ -333,5 +337,3 @@ export default function GameClient() {
     </div>
   );
 }
-
-    
