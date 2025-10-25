@@ -8,7 +8,7 @@ import { doc, updateDoc, arrayUnion, increment } from "firebase/firestore";
 import type { UserProfile } from "@/lib/firebase-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Paintbrush, Lightbulb, CheckCircle } from "lucide-react";
+import { Paintbrush, Lightbulb, CheckCircle, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,8 +17,10 @@ import { FirestorePermissionError } from "@/firebase/errors";
 import { useTheme } from "@/hooks/use-theme";
 
 const themes = [
-  { id: "noir", name: "Film Noir", description: "A classic black and white detective look." },
-  { id: "cyberpunk", name: "Cyberpunk", description: "A neon-lit futuristic theme." },
+  { id: "dark", name: "Default Dark", description: "The standard dark theme." },
+  { id: "light", name: "Default Light", description: "The standard light theme." },
+  { id: "noir", name: "Film Noir", description: "A classic black and white detective look.", isPurchasable: true },
+  { id: "cyberpunk", name: "Cyberpunk", description: "A neon-lit futuristic theme.", isPurchasable: true },
 ];
 
 const hintPacks = [
@@ -32,7 +34,7 @@ export default function StorePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { setTheme } = useTheme();
+  const { theme: activeTheme, setTheme } = useTheme();
 
   const userProfileRef = useMemoFirebase(() => 
     user ? doc(firestore, "userProfiles", user.uid) : null
@@ -46,22 +48,33 @@ export default function StorePage() {
     }
   }, [authLoading, user, router]);
   
-  const handlePurchaseTheme = async (themeId: string) => {
+  const handleThemeAction = async (themeId: string) => {
     if (!userProfileRef) return;
-    
-    updateDoc(userProfileRef, {
-        purchasedThemes: arrayUnion(themeId)
-    }).catch((serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: userProfileRef.path,
-            operation: 'update',
-            requestResourceData: { purchasedThemes: arrayUnion(themeId) },
+    const theme = themes.find(t => t.id === themeId);
+    if (!theme) return;
+
+    const isPurchased = userProfile?.purchasedThemes?.includes(themeId) || !theme.isPurchasable;
+
+    if (isPurchased) {
+        // Just apply the theme
+        setTheme(themeId as any);
+        toast({ title: "Theme Applied", description: `Switched to ${theme.name} theme.` });
+    } else {
+        // Purchase and apply the theme
+        updateDoc(userProfileRef, {
+            purchasedThemes: arrayUnion(themeId)
+        }).catch((serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: userProfileRef.path,
+                operation: 'update',
+                requestResourceData: { purchasedThemes: arrayUnion(themeId) },
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-        errorEmitter.emit('permission-error', permissionError);
-    });
-    
-    setTheme(themeId as any);
-    toast({ title: "Purchase Successful!", description: `You've unlocked and applied the ${themes.find(t=>t.id === themeId)?.name} theme.` });
+        
+        setTheme(themeId as any);
+        toast({ title: "Purchase Successful!", description: `You've unlocked and applied the ${theme.name} theme.` });
+    }
   };
 
   const handlePurchaseHints = async (packId: string, amount: number) => {
@@ -120,16 +133,17 @@ export default function StorePage() {
           <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Paintbrush /> Cosmetic Themes</h2>
           <div className="space-y-4">
             {themes.map(theme => {
-                const isPurchased = userProfile?.purchasedThemes?.includes(theme.id);
+                const isPurchased = !theme.isPurchasable || userProfile?.purchasedThemes?.includes(theme.id);
+                const isActive = activeTheme === theme.id;
                 return (
-                    <Card key={theme.id}>
+                    <Card key={theme.id} className={isActive ? "border-primary ring-2 ring-primary" : ""}>
                         <CardHeader>
                         <CardTitle>{theme.name}</CardTitle>
                         <CardDescription>{theme.description}</CardDescription>
                         </CardHeader>
                         <CardFooter>
-                        <Button onClick={() => handlePurchaseTheme(theme.id)} disabled={isPurchased}>
-                            {isPurchased ? <><CheckCircle className="mr-2 h-4 w-4" /> Purchased</> : "Purchase"}
+                        <Button onClick={() => handleThemeAction(theme.id)} disabled={isActive}>
+                            {isActive ? <><CheckCircle className="mr-2 h-4 w-4" /> Active</> : isPurchased ? <><Palette className="mr-2 h-4 w-4" /> Apply</> : "Purchase"}
                         </Button>
                         </CardFooter>
                     </Card>
