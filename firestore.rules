@@ -40,8 +40,11 @@ service cloud.firestore {
                         && request.resource.data.highestLevel >= resource.data.highestLevel
                       ) ||
                       // Allow hint purchase/usage
-                      (request.resource.data.keys().hasAll(['hints', 'updatedAt']) && 
-                        (request.resource.data.hints == resource.data.hints - 1 || request.resource.data.hints > resource.data.hints)
+                      (request.resource.data.keys().hasAll(['hints', 'updatedAt']) &&
+                        // Allow using a hint (decrement)
+                        (request.resource.data.hints == resource.data.hints - 1 ||
+                        // Allow purchasing hints (increment)
+                         request.resource.data.hints > resource.data.hints)
                       ) ||
                        // Allow theme purchase
                       (request.resource.data.keys().hasAll(['purchasedThemes', 'updatedAt']))
