@@ -32,19 +32,19 @@ service cloud.firestore {
       // The owner can update their profile under specific conditions
       allow update: if isOwner(userId) && (
                       // Allow username update
-                      (request.resource.data.keys().hasOnly(['username', 'updatedAt']) && request.resource.data.username is string) ||
+                      (request.resource.data.keys().hasAll(['username', 'updatedAt']) && request.resource.data.username is string) ||
                       // Allow score/level update from winning a game
                       (request.resource.data.keys().hasAll(['totalScore', 'highestLevel', 'rank', 'updatedAt'])
                         && request.resource.data.totalScore > resource.data.totalScore
                         && request.resource.data.totalScore <= resource.data.totalScore + 30 // Max score per round is 30
-                        && request.resource.data.highestLevel == resource.data.highestLevel + 1
+                        && request.resource.data.highestLevel >= resource.data.highestLevel
                       ) ||
                       // Allow hint purchase/usage
-                      (request.resource.data.keys().hasOnly(['hints', 'updatedAt']) && 
+                      (request.resource.data.keys().hasAll(['hints', 'updatedAt']) && 
                         (request.resource.data.hints == resource.data.hints - 1 || request.resource.data.hints > resource.data.hints)
                       ) ||
                        // Allow theme purchase
-                      (request.resource.data.keys().hasOnly(['purchasedThemes', 'updatedAt']))
+                      (request.resource.data.keys().hasAll(['purchasedThemes', 'updatedAt']))
                     );
       
       // The owner can delete their own profile
