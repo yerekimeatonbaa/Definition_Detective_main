@@ -70,10 +70,10 @@ const gameSoundFlow = ai.defineFlow(
       prompt: query,
       config: {
         responseModalities: ['AUDIO'],
-      },
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Algenib' },
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Algenib' },
+          },
         },
       },
     });
