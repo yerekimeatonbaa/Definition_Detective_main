@@ -3,13 +3,16 @@
 
 import { getApps, initializeApp, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { smartHintPrompt } from '@/ai/prompts';
+import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { z } from 'zod';
 
 // Helper function to initialize the admin app if it hasn't been already.
 function initAdminApp(): App {
   const firebaseConfig = process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG) : {};
   if (getApps().length > 0) {
-    return getApps().find(app => app.name === 'admin-app') || initializeApp(firebaseConfig, 'admin-app');
+    // Check for the default app, and if not found, check for 'admin-app'
+    return getApps().find(app => app.name === '[DEFAULT]') || getApps().find(app => app.name === 'admin-app') || initializeApp(firebaseConfig, 'admin-app');
   }
   return initializeApp(firebaseConfig, 'admin-app');
 }
@@ -30,7 +33,7 @@ export async function useHintAction(data: {
       const userDoc = await transaction.get(userProfileRef);
 
       if (!userDoc.exists) {
-        return { success: false, message: 'User profile not found.' };
+        throw new Error('User profile not found.');
       }
 
       const currentHints = userDoc.data()?.hints ?? 0;
@@ -50,30 +53,40 @@ export async function useHintAction(data: {
         return { success: false, message: transactionResult.message };
     }
 
-    // If the transaction was successful, proceed to generate the AI hint.
-    const { output } = await smartHintPrompt({
-      word: data.word,
-      incorrectGuesses: data.incorrectGuesses,
-      lettersToReveal: data.lettersToReveal,
+    // If the transaction was successful, proceed to generate the AI hint directly.
+    const hintResponse = await ai.generate({
+        model: googleAI('gemini-1.5-flash'),
+        prompt: `
+            You are an AI assistant helping with smart word puzzle hints.
+
+            Word: "${data.word}"
+            Incorrect guesses: "${data.incorrectGuesses}"
+            Letters to reveal: "${data.lettersToReveal}"
+
+            Rules:
+            - Reveal ONLY the requested number of letters.
+            - Do NOT reveal letters in incorrect guesses.
+            - Other letters must remain "_".
+            - Return ONLY a valid JSON object with a "hint" key. Example: { "hint": "e_a__p_e" }
+
+            Produce the hint now.
+        `,
+        output: {
+            schema: z.object({
+                hint: z.string(),
+            }),
+        },
+        config: {
+            responseMIMEType: 'application/json',
+        }
     });
 
-    if (output?.hint) {
-      return { success: true, hint: output.hint };
+    const hintOutput = hintResponse.output;
+
+    if (hintOutput?.hint) {
+      return { success: true, hint: hintOutput.hint };
     }
     
-    // Handle cases where the AI might return a raw string that is valid JSON
-    if (typeof output === 'string') {
-      try {
-        const parsed = JSON.parse(output);
-        if (parsed.hint) {
-          return { success: true, hint: parsed.hint };
-        }
-      } catch {
-         // Fall through to the final error if parsing fails
-      }
-    }
-
-    // If we reach here, the AI response was not in the expected format.
     throw new Error('AI did not return a valid hint format.');
 
   } catch (error: any) {
