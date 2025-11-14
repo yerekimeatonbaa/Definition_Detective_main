@@ -2,6 +2,7 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 
 /**
@@ -25,6 +26,7 @@ const SmartHintOutputSchema = z.object({
  */
 export const smartHintPrompt = ai.definePrompt({
   name: 'smartHintPrompt',
+  model: googleAI('gemini-1.5-flash'),
   input: { schema: SmartHintInputSchema },
   output: { schema: SmartHintOutputSchema },
   prompt: `
