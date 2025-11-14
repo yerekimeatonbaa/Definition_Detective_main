@@ -1,32 +1,26 @@
 
 'use server';
 
-import { initializeApp, getApps, App } from 'firebase-admin/app';
+import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
-// Initialize a local AI instance specifically for this server action.
-// This ensures the googleAI plugin is configured in the server action's context.
-const ai = genkit({
-  plugins: [
-    googleAI({
-      // Use 'v1' for standard models like Gemini Flash. 'v1beta' is for specific preview features.
-      apiVersion: 'v1', 
-    }),
-  ],
-});
-
 // Helper function to initialize the admin app if it hasn't been already.
+// This function is self-contained and should not be modified.
 function initAdminApp(): App {
   if (getApps().length > 0) {
     return getApps()[0];
   }
-  // The FIREBASE_CONFIG env var is set automatically by App Hosting.
+
+  // Check if FIREBASE_CONFIG is available and parse it.
   const firebaseConfig = process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG) : {};
+  
+  // Use the parsed config to initialize the app.
+  // This is the standard way to initialize in App Hosting.
   return initializeApp({
-    projectId: firebaseConfig.projectId
+    projectId: firebaseConfig.projectId,
   });
 }
 
@@ -37,11 +31,21 @@ export async function useHintAction(data: {
   lettersToReveal: number;
 }): Promise<{ success: boolean; message?: string; hint?: string; }> {
   try {
+    // This local `ai` instance is configured specifically for this server action.
+    const ai = genkit({
+      plugins: [
+        googleAI({
+          // Use 'v1' for standard models. 'v1beta' is for specific preview features.
+          apiVersion: 'v1', 
+        }),
+      ],
+    });
+
     initAdminApp();
     const firestore = getFirestore();
     const userProfileRef = firestore.collection('userProfiles').doc(data.userId);
 
-    // First, run a transaction to securely decrement the hint count.
+    // Run a transaction to securely decrement the hint count.
     const transactionResult = await firestore.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userProfileRef);
 
@@ -68,6 +72,7 @@ export async function useHintAction(data: {
 
     // If the transaction was successful, proceed to generate the AI hint.
     const hintResponse = await ai.generate({
+        // The model MUST be a model reference object, not a string.
         model: googleAI.model('gemini-1.5-flash'),
         prompt: `
             You are an AI assistant for a word puzzle game. Your task is to provide a "smart hint".
@@ -91,10 +96,8 @@ export async function useHintAction(data: {
             schema: z.object({
                 hint: z.string(),
             }),
+            format: 'json',
         },
-        config: {
-            responseMIMEType: 'application/json',
-        }
     });
     
     const hintOutput = hintResponse.output;
