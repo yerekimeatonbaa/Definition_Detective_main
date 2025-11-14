@@ -3,40 +3,30 @@
 
 import { getApps, initializeApp, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import { smartHintPrompt } from '@/ai/prompts';
-
 
 // Helper function to initialize the admin app if it hasn't been already.
 function initAdminApp(): App {
+  const firebaseConfig = process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG) : {};
   if (getApps().length > 0) {
-    return getApps()[0];
+    return getApps().find(app => app.name === 'admin-app') || initializeApp(firebaseConfig, 'admin-app');
   }
-  
-  // The FIREBASE_CONFIG env var is set automatically by App Hosting.
-  const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG || '{}');
-  
-  return initializeApp({
-      projectId: firebaseConfig.projectId,
-  });
+  return initializeApp(firebaseConfig, 'admin-app');
 }
 
-const SmartHintInputSchema = z.object({
-  word: z.string(),
-  incorrectGuesses: z.string(),
-  lettersToReveal: z.number(),
-});
-
-type SmartHintInput = z.infer<typeof SmartHintInputSchema>;
-
-export async function useHintAction(data: { userId: string } & SmartHintInput): Promise<{ success: boolean; message?: string; hint?: string; }> {
+export async function useHintAction(data: { 
+  userId: string;
+  word: string;
+  incorrectGuesses: string;
+  lettersToReveal: number;
+}): Promise<{ success: boolean; message?: string; hint?: string; }> {
   try {
     initAdminApp();
     const firestore = getFirestore();
     const userProfileRef = firestore.collection('userProfiles').doc(data.userId);
-    
-    const result = await firestore.runTransaction(async (transaction) => {
+
+    // First, run a transaction to securely decrement the hint count.
+    const transactionResult = await firestore.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userProfileRef);
 
       if (!userDoc.exists) {
@@ -52,14 +42,15 @@ export async function useHintAction(data: { userId: string } & SmartHintInput): 
       // Decrement the hints count by 1.
       transaction.update(userProfileRef, { hints: currentHints - 1 });
       
-      return { success: true, message: 'Hint used successfully.' };
+      return { success: true };
     });
 
-    if (!result.success) {
-        return { success: false, message: result.message };
+    // If the transaction failed (e.g., not enough hints), return the error.
+    if (!transactionResult.success) {
+        return { success: false, message: transactionResult.message };
     }
 
-    // If transaction was successful, generate hint
+    // If the transaction was successful, proceed to generate the AI hint.
     const { output } = await smartHintPrompt({
       word: data.word,
       incorrectGuesses: data.incorrectGuesses,
@@ -70,7 +61,7 @@ export async function useHintAction(data: { userId: string } & SmartHintInput): 
       return { success: true, hint: output.hint };
     }
     
-    // Handle raw string response from AI
+    // Handle cases where the AI might return a raw string that is valid JSON
     if (typeof output === 'string') {
       try {
         const parsed = JSON.parse(output);
@@ -78,11 +69,12 @@ export async function useHintAction(data: { userId: string } & SmartHintInput): 
           return { success: true, hint: parsed.hint };
         }
       } catch {
-         // fall through to error
+         // Fall through to the final error if parsing fails
       }
     }
 
-    throw new Error('AI did not return a valid hint.');
+    // If we reach here, the AI response was not in the expected format.
+    throw new Error('AI did not return a valid hint format.');
 
   } catch (error: any) {
     console.error('Error in useHintAction:', error);

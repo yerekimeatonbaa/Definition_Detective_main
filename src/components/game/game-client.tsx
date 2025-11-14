@@ -113,36 +113,43 @@ export default function GameClient() {
   }, [wordData, gameState, guessedLetters, playSound, revealedByHint]);
 
   const getHint = async (isFree: boolean = false) => {
-    if (!wordData || (!user && !isFree)) return;
+    if (!wordData || (!user && !isFree)) {
+        toast({
+            variant: "destructive",
+            title: "Login Required",
+            description: "You must be logged in to use hints or watch ads.",
+        });
+        return;
+    }
     
     startHintTransition(async () => {
-      const lettersToRevealCount = revealedByHint.length + 1;
-      
       try {
         let result;
         if (isFree) {
-          // If the hint is free, we don't need to call the transaction part of the action.
-          // For simplicity, we'll just generate the hint directly.
-          // Note: a more robust solution might have a separate action for free hints.
-          const { smartHintPrompt } = await import('@/ai/prompts');
-          const { output } = await smartHintPrompt({
-            word: wordData.word,
-            incorrectGuesses: guessedLetters.incorrect.join(''),
-            lettersToReveal: lettersToRevealCount,
-          });
-          result = { success: true, hint: output?.hint };
+            // For a free hint from an ad, we only need to call the AI part.
+            // We can re-use the same server action but we need a way to bypass the payment.
+            // A simpler approach for now is to just call the AI directly.
+            // A better long-term solution would be a separate server action or parameter.
+            const { smartHintPrompt } = await import('@/ai/prompts');
+            const { output } = await smartHintPrompt({
+                word: wordData.word,
+                incorrectGuesses: guessedLetters.incorrect.join(''),
+                lettersToReveal: revealedByHint.length + 1,
+            });
+            result = { success: true, hint: output?.hint };
 
         } else if(user) {
+           // For a paid hint, call the all-in-one server action
            result = await useHintAction({
             userId: user.uid,
             word: wordData.word,
             incorrectGuesses: guessedLetters.incorrect.join(''),
-            lettersToReveal: lettersToRevealCount,
+            lettersToReveal: revealedByHint.length + 1,
           });
         } else {
-            throw new Error("User not logged in for paid hint.");
+            // This case should be caught by the initial check, but for safety:
+            throw new Error("User not logged in.");
         }
-
 
         if (result && result.success && result.hint) {
           setHint(result.hint);
@@ -150,7 +157,8 @@ export default function GameClient() {
           setRevealedByHint(newHintedLetters);
           playSound('hint');
         } else {
-           throw new Error(result.message || "Invalid hint response from server.");
+           // If the action failed, show the message from the server.
+           throw new Error(result.message || "Invalid response from server.");
         }
       } catch (error: any) {
          toast({
@@ -163,6 +171,10 @@ export default function GameClient() {
   };
 
   const handleRewardedAd = () => {
+    if (!user) {
+        toast({ variant: "destructive", title: "Login Required", description: "You must log in to watch an ad for a hint."});
+        return;
+    }
     setIsWatchingAd(true);
     setAdProgress(0);
 
@@ -320,12 +332,12 @@ export default function GameClient() {
               <Lightbulb className={cn("mr-2 h-4 w-4", isHintLoading && !isWatchingAd && "animate-spin")} />
               {isHintLoading && !isWatchingAd ? 'Getting Hint...' : 'Use a Hint'}
             </Button>
-             <Button onClick={handleRewardedAd} disabled={isHintLoading || allLettersGuessed || !user} variant="outline">
+             <Button onClick={handleRewardedAd} disabled={isHintLoading || allLettersGuessed} variant="outline">
               <Clapperboard className={cn("mr-2 h-4 w-4", isWatchingAd && "animate-spin")} />
               {isWatchingAd ? 'Loading Ad...' : 'Watch Ad for Hint'}
             </Button>
           </div>
-          {!user && <p className="text-center text-destructive text-sm">Please log in to use hints and save progress.</p>}
+          {!user && <p className="text-center text-sm text-muted-foreground">Please log in to use hints and save progress.</p>}
           <p className="text-center text-muted-foreground">Incorrect Guesses: {guessedLetters.incorrect.join(', ').toUpperCase()} ({incorrectTriesLeft} left)</p>
           <Keyboard onKeyClick={handleGuess} guessedLetters={guessedLetters} revealedByHint={revealedByHint} />
         </>
