@@ -12,7 +12,8 @@ import { z } from 'zod';
 const ai = genkit({
   plugins: [
     googleAI({
-      apiVersion: 'v1beta',
+      // Use 'v1' for standard models like Gemini Flash. 'v1beta' is for specific preview features.
+      apiVersion: 'v1', 
     }),
   ],
 });
