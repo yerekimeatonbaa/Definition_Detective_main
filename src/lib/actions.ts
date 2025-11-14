@@ -3,6 +3,10 @@
 
 import { getApps, initializeApp, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { smartHintPrompt } from '@/ai/prompts';
+
 
 // Helper function to initialize the admin app if it hasn't been already.
 function initAdminApp(): App {
@@ -18,10 +22,16 @@ function initAdminApp(): App {
   });
 }
 
+const SmartHintInputSchema = z.object({
+  word: z.string(),
+  incorrectGuesses: z.string(),
+  lettersToReveal: z.number(),
+});
 
-export async function useHintAction(data: { userId: string }) {
+type SmartHintInput = z.infer<typeof SmartHintInputSchema>;
+
+export async function useHintAction(data: { userId: string } & SmartHintInput): Promise<{ success: boolean; message?: string; hint?: string; }> {
   try {
-    // Initialize the admin app.
     initAdminApp();
     const firestore = getFirestore();
     const userProfileRef = firestore.collection('userProfiles').doc(data.userId);
@@ -45,11 +55,37 @@ export async function useHintAction(data: { userId: string }) {
       return { success: true, message: 'Hint used successfully.' };
     });
 
-    return { ...result, error: null };
+    if (!result.success) {
+        return { success: false, message: result.message };
+    }
+
+    // If transaction was successful, generate hint
+    const { output } = await smartHintPrompt({
+      word: data.word,
+      incorrectGuesses: data.incorrectGuesses,
+      lettersToReveal: data.lettersToReveal,
+    });
+
+    if (output?.hint) {
+      return { success: true, hint: output.hint };
+    }
+    
+    // Handle raw string response from AI
+    if (typeof output === 'string') {
+      try {
+        const parsed = JSON.parse(output);
+        if (parsed.hint) {
+          return { success: true, hint: parsed.hint };
+        }
+      } catch {
+         // fall through to error
+      }
+    }
+
+    throw new Error('AI did not return a valid hint.');
 
   } catch (error: any) {
-    console.error('Error using hint:', error);
-    // Return a generic error message to the client.
-    return { success: false, message: 'An unexpected error occurred while using a hint.', error: 'Failed to use a hint. Please try again.' };
+    console.error('Error in useHintAction:', error);
+    return { success: false, message: error.message || 'An unexpected error occurred while getting a hint.' };
   }
 }

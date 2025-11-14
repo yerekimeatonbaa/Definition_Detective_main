@@ -9,7 +9,6 @@ import { Keyboard } from "@/components/game/keyboard";
 import { Lightbulb, RotateCw, XCircle, Award, PartyPopper, Clapperboard, Share } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useHintAction } from "@/lib/actions";
-import { requestSmartHint } from "@/lib/api/hints";
 import { useGameSounds } from "@/hooks/use-game-sounds";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -89,7 +88,14 @@ export default function GameClient() {
   useEffect(() => {
     // This ensures getWordByDifficulty (with Math.random) only runs on the client.
     startNewGame(level);
-  }, [level, startNewGame]);
+  }, []);
+  
+  useEffect(() => {
+    if(gameState === 'playing') {
+      startNewGame(level);
+    }
+  }, [level]);
+
 
   const handleGuess = useCallback((letter: string) => {
     if (gameState !== "playing" || guessedLetters.correct.includes(letter) || guessedLetters.incorrect.includes(letter) || revealedByHint.includes(letter.toLowerCase())) {
@@ -107,42 +113,50 @@ export default function GameClient() {
   }, [wordData, gameState, guessedLetters, playSound, revealedByHint]);
 
   const getHint = async (isFree: boolean = false) => {
-    if (!wordData || !userProfileRef || !user) return;
+    if (!wordData || (!user && !isFree)) return;
     
     startHintTransition(async () => {
-      if (!isFree) {
-        const useHintResult = await useHintAction({ userId: user.uid });
-        if (!useHintResult.success) {
-          toast({
-            variant: "destructive",
-            title: "Out of Hints",
-            description: useHintResult.message || "You don't have any hints left. Watch an ad or buy more in the store.",
-          });
-          return;
-        }
-      }
-
       const lettersToRevealCount = revealedByHint.length + 1;
+      
       try {
-        const result = await requestSmartHint({
-          word: wordData.word,
-          incorrectGuesses: guessedLetters.incorrect.join(''),
-          lettersToReveal: lettersToRevealCount,
-        });
+        let result;
+        if (isFree) {
+          // If the hint is free, we don't need to call the transaction part of the action.
+          // For simplicity, we'll just generate the hint directly.
+          // Note: a more robust solution might have a separate action for free hints.
+          const { smartHintPrompt } = await import('@/ai/prompts');
+          const { output } = await smartHintPrompt({
+            word: wordData.word,
+            incorrectGuesses: guessedLetters.incorrect.join(''),
+            lettersToReveal: lettersToRevealCount,
+          });
+          result = { success: true, hint: output?.hint };
 
-        if (result && result.hint) {
+        } else if(user) {
+           result = await useHintAction({
+            userId: user.uid,
+            word: wordData.word,
+            incorrectGuesses: guessedLetters.incorrect.join(''),
+            lettersToReveal: lettersToRevealCount,
+          });
+        } else {
+            throw new Error("User not logged in for paid hint.");
+        }
+
+
+        if (result && result.success && result.hint) {
           setHint(result.hint);
           const newHintedLetters = result.hint.split('').filter(char => char !== '_').map(char => char.toLowerCase());
           setRevealedByHint(newHintedLetters);
           playSound('hint');
         } else {
-           throw new Error("Invalid hint response from AI.");
+           throw new Error(result.message || "Invalid hint response from server.");
         }
-      } catch (error) {
+      } catch (error: any) {
          toast({
             variant: "destructive",
             title: "Hint Error",
-            description: 'Failed to get a hint. Please try again.',
+            description: error.message || 'Failed to get a hint. Please try again.',
           });
       }
     });
@@ -233,6 +247,7 @@ export default function GameClient() {
   
     } else if (guessedLetters.incorrect.length >= MAX_INCORRECT_TRIES) {
       setGameState("lost");
+      playSound('incorrect');
     }
   }, [guessedLetters, wordData, level, playSound, startNewGame, updateFirestoreUser, gameState, displayedWord, hint, revealedByHint]);
 
@@ -242,7 +257,7 @@ export default function GameClient() {
   }
   
   const incorrectTriesLeft = MAX_INCORRECT_TRIES - guessedLetters.incorrect.length;
-  const allLettersGuessed = wordData && (wordData.word.length === (guessedLetters.correct.length + revealedByHint.length));
+  const allLettersGuessed = wordData && displayedWord.every(item => item.revealed);
   const hintDisabled = isHintLoading || allLettersGuessed || !user || profileLoading;
 
   const shareText = "I'm playing Definition Detective! Can you beat my high score?";
