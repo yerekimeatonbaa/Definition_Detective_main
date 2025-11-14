@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getApps, initializeApp, App, cert } from 'firebase-admin/app';
+import { getApps, initializeApp, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
