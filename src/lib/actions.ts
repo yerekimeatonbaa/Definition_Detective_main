@@ -34,7 +34,7 @@ export async function useHintAction(data: {
     const ai = genkit({
       plugins: [
         googleAI({
-          apiVersion: 'v1',
+          apiVersion: 'v1beta',
         }),
       ],
     });
@@ -95,7 +95,7 @@ export async function useHintAction(data: {
             Produce the JSON response now.
         `,
         generationConfig: {
-            responseMimeType: 'application/json',
+            response_mime_type: 'application/json',
         },
     });
     
