@@ -73,12 +73,13 @@ export default function Home() {
 
   const startNewGame = useCallback(async (currentLevel: number, currentWord?: string) => {
     setIsGameLoading(true);
+    setGameState("playing");
     const difficulty = getDifficultyForLevel(currentLevel);
     let newWordData: WordData | null = null;
     
     try {
         let attempts = 0;
-        while(attempts < 3) { // Retry logic in case AI returns the same word
+        while(attempts < 3) { 
             const result = await generateWord({ difficulty });
             if (result.word.toLowerCase() !== currentWord?.toLowerCase()) {
                 newWordData = { ...result, difficulty };
@@ -90,14 +91,13 @@ export default function Home() {
             throw new Error("Failed to generate a new word.");
         }
     } catch (error) {
-        console.error("Failed to generate word, falling back to static list.", error);
+        console.error("Failed to generate word.", error);
         toast({
             variant: "destructive",
             title: "Connection Error",
             description: "Could not generate a new word. Please check your connection."
         });
-        // As a fallback, you could use a static list here if needed
-        newWordData = null; // Or get from a static list
+        newWordData = null;
     }
 
     if(newWordData) {
@@ -105,14 +105,13 @@ export default function Home() {
         setGuessedLetters({ correct: [], incorrect: [] });
         setHint(null);
         setRevealedByHint([]);
-        setGameState("playing");
     }
     setIsGameLoading(false);
   }, [toast]);
 
   useEffect(() => {
-    startNewGame(level);
-  }, [level, startNewGame]);
+    startNewGame(1);
+  }, [startNewGame]);
 
 
   const handleGuess = useCallback((letter: string) => {
@@ -183,7 +182,7 @@ export default function Home() {
           clearInterval(interval);
           setTimeout(() => {
             setIsWatchingAd(false);
-            getHint(true); // Grant a free hint
+            getHint(true); 
           }, 500);
           return 100;
         }
@@ -247,7 +246,9 @@ export default function Home() {
       const scoreGained = (difficulty === 'easy' ? 10 : difficulty === 'medium' ? 20 : 30);
       
       const newLevel = level + 1;
-      updateFirestoreUser(scoreGained, newLevel);
+      if (user) {
+        updateFirestoreUser(scoreGained, newLevel);
+      }
       setScore(s => s + scoreGained);
       
       setTimeout(() => {
@@ -259,7 +260,7 @@ export default function Home() {
       setGameState("lost");
       playSound('incorrect');
     }
-  }, [guessedLetters, wordData, level, playSound, startNewGame, updateFirestoreUser, gameState, displayedWord, hint, revealedByHint]);
+  }, [guessedLetters, wordData, level, playSound, startNewGame, updateFirestoreUser, gameState, displayedWord, hint, revealedByHint, user]);
 
   const gameContent = () => {
     if (isGameLoading || !wordData) {
@@ -274,81 +275,81 @@ export default function Home() {
 
     return (
         <div className="w-full max-w-4xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2 text-lg">
-            <Award className="h-6 w-6 text-primary" />
-            Score: <span className="font-bold">{score.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center gap-2 text-lg">
-            <Lightbulb className="h-6 w-6 text-yellow-400" />
-            Hints: <span className="font-bold">{profileLoading ? '...' : userProfile?.hints ?? 0}</span>
-            </div>
-            <div className="flex items-center gap-2 text-lg">
-            Level: <span className="font-bold">{level}</span>
-            </div>
-        </div>
+          <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2 text-lg">
+              <Award className="h-6 w-6 text-primary" />
+              Score: <span className="font-bold">{(user ? score : 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center gap-2 text-lg">
+              <Lightbulb className="h-6 w-6 text-yellow-400" />
+              Hints: <span className="font-bold">{profileLoading ? '...' : userProfile?.hints ?? 0}</span>
+              </div>
+              <div className="flex items-center gap-2 text-lg">
+              Level: <span className="font-bold">{user ? level : 1}</span>
+              </div>
+          </div>
 
-        <Card>
-            <CardHeader>
-            <CardTitle className="text-center">Definition</CardTitle>
-            </CardHeader>
-            <CardContent>
-            <p className="text-center text-lg italic text-muted-foreground p-4 bg-muted/50 rounded-md">{wordData.definition}</p>
-            </CardContent>
-        </Card>
+          <Card>
+              <CardHeader>
+              <CardTitle className="text-center">Definition</CardTitle>
+              </CardHeader>
+              <CardContent>
+              <p className="text-center text-lg italic text-muted-foreground p-4 bg-muted/50 rounded-md">{wordData.definition}</p>
+              </CardContent>
+          </Card>
 
-        <div className="flex justify-center items-center gap-2 md:gap-4 my-8">
-            {displayedWord.map(({ char, revealed }, index) => (
-            <div key={index} className="flex items-center justify-center h-12 w-12 md:h-16 md:w-16 border-b-4 border-primary text-3xl md:text-4xl font-bold uppercase bg-muted/30 rounded-md">
-                {revealed && <span className="animate-in fade-in zoom-in-50 duration-500">{char}</span>}
-            </div>
-            ))}
-        </div>
-        
-        {(gameState === "won" || gameState === "lost") ? (
-            <Alert variant={gameState === 'won' ? 'default' : 'destructive'} className="text-center">
-            {gameState === 'won' ? <PartyPopper className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            <AlertTitle className="text-2xl font-bold">
-                {gameState === 'won' ? "You solved it!" : "Case closed... incorrectly."}
-            </AlertTitle>
-            <AlertDescription>
-                {gameState === 'won' ? `The word was "${wordData?.word}". Loading next case...` : `The word was "${wordData?.word}". Better luck next time.`}
-            </AlertDescription>
+          <div className="flex justify-center items-center gap-2 md:gap-4 my-8">
+              {displayedWord.map(({ char, revealed }, index) => (
+              <div key={index} className="flex items-center justify-center h-12 w-12 md:h-16 md:w-16 border-b-4 border-primary text-3xl md:text-4xl font-bold uppercase bg-muted/30 rounded-md">
+                  {revealed && <span className="animate-in fade-in zoom-in-50 duration-500">{char}</span>}
+              </div>
+              ))}
+          </div>
+          
+          {(gameState === "won" || gameState === "lost") ? (
+              <Alert variant={gameState === 'won' ? 'default' : 'destructive'} className="text-center">
+              {gameState === 'won' ? <PartyPopper className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              <AlertTitle className="text-2xl font-bold">
+                  {gameState === 'won' ? "You solved it!" : "Case closed... incorrectly."}
+              </AlertTitle>
+              <AlertDescription>
+                  {gameState === 'won' ? `The word was "${wordData?.word}". Loading next case...` : `The word was "${wordData?.word}". Better luck next time.`}
+              </AlertDescription>
 
-            {gameState === 'lost' && (
-                <div className="mt-4 flex justify-center gap-4">
-                    <Button onClick={() => startNewGame(level, wordData?.word)}>
-                        <RotateCw className="mr-2 h-4 w-4" /> Retry Level
-                    </Button>
-                </div>
-            )}
-            </Alert>
-        ) : (
-            <>
-            <div className="flex justify-center gap-4">
-                <Button onClick={() => getHint(false)} disabled={hintDisabled}>
-                <Lightbulb className={cn("mr-2 h-4 w-4", isHintLoading && !isWatchingAd && "animate-spin")} />
-                {isHintLoading && !isWatchingAd ? 'Getting Hint...' : 'Use a Hint'}
-                </Button>
-                <Button onClick={handleRewardedAd} disabled={isHintLoading || allLettersGuessed} variant="outline">
-                <Clapperboard className={cn("mr-2 h-4 w-4", isWatchingAd && "animate-spin")} />
-                {isWatchingAd ? 'Loading Ad...' : 'Watch Ad for Hint'}
-                </Button>
-            </div>
-            {!user && <p className="text-center text-sm text-muted-foreground">Please log in to use hints and save progress.</p>}
-            <p className="text-center text-muted-foreground">Incorrect Guesses: {guessedLetters.incorrect.join(', ').toUpperCase()} ({incorrectTriesLeft} left)</p>
-            <Keyboard onKeyClick={handleGuess} guessedLetters={guessedLetters} revealedByHint={revealedByHint} />
-            </>
-        )}
+              {gameState === 'lost' && (
+                  <div className="mt-4 flex justify-center gap-4">
+                      <Button onClick={() => startNewGame(level, wordData?.word)}>
+                          <RotateCw className="mr-2 h-4 w-4" /> Retry Level
+                      </Button>
+                  </div>
+              )}
+              </Alert>
+          ) : (
+              <>
+              <div className="flex justify-center gap-4">
+                  <Button onClick={() => getHint(false)} disabled={hintDisabled}>
+                  <Lightbulb className={cn("mr-2 h-4 w-4", isHintLoading && !isWatchingAd && "animate-spin")} />
+                  {isHintLoading && !isWatchingAd ? 'Getting Hint...' : 'Use a Hint'}
+                  </Button>
+                  <Button onClick={handleRewardedAd} disabled={isHintLoading || allLettersGuessed} variant="outline">
+                  <Clapperboard className={cn("mr-2 h-4 w-4", isWatchingAd && "animate-spin")} />
+                  {isWatchingAd ? 'Loading Ad...' : 'Watch Ad for Hint'}
+                  </Button>
+              </div>
+              {!user && <p className="text-center text-sm text-muted-foreground">Please log in to use hints and save progress.</p>}
+              <p className="text-center text-muted-foreground">Incorrect Guesses: {guessedLetters.incorrect.join(', ').toUpperCase()} ({incorrectTriesLeft} left)</p>
+              <Keyboard onKeyClick={handleGuess} guessedLetters={guessedLetters} revealedByHint={revealedByHint} />
+              </>
+          )}
 
-        <div className="mt-12 pt-8 border-t border-dashed">
-            <p className="text-sm font-medium flex items-center justify-center gap-2 mb-4 text-muted-foreground"><Share className="h-4 w-4" /> Share The Game!</p>
-            <div className="flex justify-center gap-2">
-            <ShareButton platform="whatsapp" text={shareText} />
-            <ShareButton platform="facebook" text={shareText} />
-            <ShareButton platform="x" text={shareText} />
-            </div>
-        </div>
+          <div className="mt-12 pt-8 border-t border-dashed">
+              <p className="text-sm font-medium flex items-center justify-center gap-2 mb-4 text-muted-foreground"><Share className="h-4 w-4" /> Share The Game!</p>
+              <div className="flex justify-center gap-2">
+              <ShareButton platform="whatsapp" text={shareText} />
+              <ShareButton platform="facebook" text={shareText} />
+              <ShareButton platform="x" text={shareText} />
+              </div>
+          </div>
         </div>
     );
   }
