@@ -1,12 +1,11 @@
+
 // src/ai/genkit.ts
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiVersion: 'v1beta', // required for TTS + audio
-    }),
+    googleAI(),
   ],
 
   // ❌ Do NOT set a "default model" here.
