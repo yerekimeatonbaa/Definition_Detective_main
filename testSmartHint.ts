@@ -10,7 +10,7 @@ async function testSmartHint() {
     isFree: true // Test as a free hint to bypass user auth
   });
 
-  console.log('ðŸ§  Smart Hint Output:', result);
+  console.log('ðŸ§  Smart Hint Output:', result);
 }
 
 testSmartHint().catch(console.error);
