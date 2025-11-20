@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import GameClient from '@/components/game/game-client';
 
 export default function Home() {
@@ -13,5 +14,14 @@ export default function Home() {
       </div>
       <GameClient />
     </div>
+=======
+import GameClient from "@/components/game-client";
+
+export default function Home() {
+  return (
+    <main className="flex flex-col items-center justify-center p-4 md:p-8">
+      <GameClient />
+    </main>
+>>>>>>> e3022b0a0d8c07c085311a31fdf53cd8935a5097
   );
 }
