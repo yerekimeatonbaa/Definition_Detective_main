@@ -210,7 +210,6 @@ export default function Home() {
     if (user && firestore) {
         const userRef = doc(firestore, "userProfiles", user.uid);
         
-        // We need to get the current score to calculate the new rank
         const userDoc = await getDoc(userRef);
         const currentScore = userDoc.data()?.totalScore ?? 0;
         const newTotalScore = currentScore + scoreGained;
@@ -253,7 +252,6 @@ export default function Home() {
       
       setTimeout(() => {
         setLevel(newLevel);
-        // startNewGame is now async, but we don't need to await it here
         startNewGame(newLevel, wordData.word);
       }, 3000);
   
@@ -386,5 +384,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
