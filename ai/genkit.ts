@@ -1,12 +1,10 @@
 // src/ai/genkit.ts
 import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { googleAI } from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      apiVersion: 'v1beta', // needed for Gemini 1.5 Flash + TTS
-    }),
+    googleAI(),
   ],
 
   // ❌ Do NOT set a "default model" here.

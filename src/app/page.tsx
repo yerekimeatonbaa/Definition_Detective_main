@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo, useTransition } from "react";
 import { type WordData, getRankForScore } from "@/lib/game-data";
 import { generateWord } from "@/ai/flows/generate-word-flow";
-import { generateHint } from "@/ai/flows/generate-hints";
+import { useHintAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Keyboard } from "@/components/game/keyboard";
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import ShareButton from "@/components/game/share-button";
-import { useHintAction } from "@/lib/actions";
 
 
 type GameState = "playing" | "won" | "lost";
