@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to generate a word and its definition for the game.
@@ -24,7 +25,7 @@ const prompt = ai.definePrompt({
   name: 'generateWordPrompt',
   input: { schema: GenerateWordInputSchema },
   output: { schema: GenerateWordOutputSchema },
-  model: googleAI.model('gemini-1.5-pro'),
+  model: googleAI.model('gemini-pro'),
   generationConfig: {
     responseMimeType: 'application/json',
   },

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to generate a smart hint for the word puzzle game.
@@ -22,7 +23,7 @@ const prompt = ai.definePrompt({
   name: 'generateHintPrompt',
   input: { schema: GenerateHintInputSchema },
   output: { schema: GenerateHintOutputSchema },
-  model: googleAI.model('gemini-1.5-pro'),
+  model: googleAI.model('gemini-pro'),
   prompt: `You are an AI assistant for a word puzzle game. Your task is to provide a "smart hint".
 The user gives you a secret word, a string of letters they have already guessed incorrectly, and a number of letters to reveal.
 
