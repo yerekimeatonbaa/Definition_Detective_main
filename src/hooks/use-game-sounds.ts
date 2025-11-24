@@ -24,7 +24,7 @@ class GameSoundPlayer {
         this.audioContext = new (window.AudioContext ||
           (window as any).webkitAudioContext)();
       } catch (e) {
-        console.error('Web Audio API is not supported in this browser.');
+        console.error('Web Audio API is not supported in this browser.', e);
       }
     }
   }

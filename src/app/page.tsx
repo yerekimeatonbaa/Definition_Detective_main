@@ -222,7 +222,7 @@ export default function Home() {
         };
 
         updateDoc(userRef, updateData)
-            .catch((serverError) => {
+          .catch((_serverError) => {
                 const permissionError = new FirestorePermissionError({
                     path: userRef.path,
                     operation: 'update',
