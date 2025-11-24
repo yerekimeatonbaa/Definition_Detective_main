@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setDoc(userRef, userData)
-          .catch((_serverError) => {
+          .catch(() => {
             const permissionError = new FirestorePermissionError({
               path: userRef.path,
               operation: 'create',
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const updateData = { username: newName };
         
         updateDoc(userRef, updateData)
-          .catch((_serverError) => {
+          .catch(() => {
             const permissionError = new FirestorePermissionError({
               path: userRef.path,
               operation: 'update',
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
         const userRef = doc(firestore, 'userProfiles', user.uid);
         
-        deleteDoc(userRef).catch((_err) => {
+        deleteDoc(userRef).catch(() => {
              const permissionError = new FirestorePermissionError({
               path: userRef.path,
               operation: 'delete',
