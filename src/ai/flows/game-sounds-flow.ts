@@ -58,7 +58,7 @@ const gameSoundFlow = ai.defineFlow(
   },
   async query => {
     const { media } = await ai.generate({
-      model: googleAI.models['gemini-1.5-flash-tts'], // ✅ Updated TTS model
+      model: googleAI.model('gemini-1.5-flash-tts'), // ✅ Updated TTS model
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
